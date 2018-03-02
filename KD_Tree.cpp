@@ -52,11 +52,14 @@ void localSort(vector<vector<double> >& v, int begin, int end, int dimension) {
   sort(v.begin()+begin, v.begin()+end+1, compareFunc);
 }
 
-void localSort_1(struct Parameters * param) {
-  vector<vector<double> >* d = param->data;
+void * localSort_1(void* p) {
+  struct Parameters * param = (struct Parameters * )p;
   int begin = param->begin;
   int end = param->end;
+  if (begin >= end) return NULL;
+  vector<vector<double> >* d = param->data;
   int dimension = param->dimension;
+
   for (int i = begin; i <= end; ++i) {
     d->at(i).back() = dimension;
   }
@@ -74,13 +77,16 @@ void localSort_1(struct Parameters * param) {
   p_2->begin = mid+1;
   p_2->end = end;
   p_2->dimension = dimension+1;
+  cout << "PID_1: " << pid_1 << endl;
+  cout << "PID_2: " << pid_2 << endl;
   int s_1 = pthread_create(&pid_1, NULL, &localSort_1, (void*)p_1);
   int s_2 = pthread_create(&pid_2, NULL, &localSort_1, (void*)p_2);
-  pthread_join(&pid_1, NULL);
-  pthread_join(&pid_2, NULL);
+
+  pthread_join(pid_1, NULL);
+  pthread_join(pid_2, NULL);
   free(p_1);
   free(p_2);
-  return;
+  return NULL;
 }
 
 void prepareTreeHelper(vector<vector<double> >& data, int begin, int end, int dimension) {
@@ -103,7 +109,26 @@ void prepareTree(vector<vector<double> >& data) {
   return;
 }
 
-Node* buildTreeHelper(const vector<vector<double> >& data,int begin, int end, int dimension) {
+void prepareTree_1(vector<vector<double> >& data) {
+  for (int i = 0; i < data.size(); ++i) {
+    data[i].push_back(0);
+  }
+  struct Parameters p;
+  p.data = &data;
+  p.begin = 0;
+  p.end = 0;
+  p.dimension = 0;
+  pthread_t t;
+  pthread_create(&t, NULL, &localSort_1, (void*)&p);
+  // localSort_1(&p);
+  pthread_join(t, NULL);
+  for (int i = 0; i < data.size(); ++i) {
+    data[i].pop_back();
+  }
+  return;
+}
+
+Node* buildTreeHelper(const vector<vector<double> >& data, int begin, int end, int dimension) {
   if (begin > end) return NULL;
   if (begin == end) {
     return new Node(begin, dimension);
@@ -117,6 +142,12 @@ Node* buildTreeHelper(const vector<vector<double> >& data,int begin, int end, in
 
 Node* buildTree(vector<vector<double> >& data) {
   prepareTree(data);
+  Node* root = buildTreeHelper(data, 0, data.size()-1,0);
+  return root;
+}
+
+Node* buildTree_1(vector<vector<double> >& data) {
+  prepareTree_1(data);
   Node* root = buildTreeHelper(data, 0, data.size()-1,0);
   return root;
 }
@@ -184,12 +215,37 @@ void query(const vector<vector<double> >& data, Node* current, const vector<doub
   return;
 }
 
+void checkMT(const vector<vector<double> >& single, const vector<vector<double> >& multi) {
+  assert(single.size() == multi.size());
+  for (int i = 0; i < single.size(); ++i) {
+    assert(single[i].size() == multi[i].size());
+    for (int j = 0; j < single[i].size(); ++j) {
+      if (single[i][j] != multi[i][j]) {
+        cout << single[i][j] << ", " << multi[i][j];
+        cout << "Wrong answer!! " <<endl;
+      }
+    }
+  }
+}
 
-//int main(int argc, char const *argv[]) {
-//  srand(time(NULL));
-//  vector<vector<double> > data = randomData(20, 5);
-//  Node* root = buildTree(data);
-//  printData(data);
-//  printTree(data, root);
-//  return 0;
-//}
+
+int main(int argc, char const *argv[]) {
+ srand(time(NULL));
+ vector<vector<double> > data = randomData(20, 5);
+ // vector<vector<double> > d_mt(data);
+ // Node* root = buildTree(data);
+ // Node* r_mt = buildTree_1(d_mt);
+ // printData(data);
+ // printData(d_mt);
+
+ prepareTree(data);
+ // prepareTree_1(d_mt);
+
+ // checkMT(data, d_mt);
+ // printData(data);
+ // printData(d_mt);
+
+ // printTree(data, root);
+ // printTree(d_mt, r_mt);
+ return 0;
+}
